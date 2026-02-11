@@ -108,11 +108,19 @@ function renderDispatch() {
       <p>${customer.address || "No address"}</p>
       <div class="color-bar" style="background:${urgencyColor}"></div>
       <div class="status">Status: ${job.status}</div>
-      <button class="small-btn" onclick="renderJob('${job.id}')">Open</button>
+      <button class="small-btn" data-jobid="${job.id}">Open</button>
     `;
     list.appendChild(card);
   });
+
+  // ADD EVENT LISTENERS AFTER THE JOB LIST IS CREATED
+  document.querySelectorAll("#jobList button[data-jobid]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      renderJob(btn.getAttribute("data-jobid"));
+    });
+  });
 }
+
 
 function renderJob(id) {
   const db = loadDB();
