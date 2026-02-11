@@ -1,5 +1,10 @@
-const cacheName = "we-field-cache-v1";
-const assetsToCache = ["index.html", "styles.css", "app.js"];
+const cacheName = "we-field-cache-v2";
+const assetsToCache = [
+  "index.html",
+  "styles.css",
+  "app.js",
+  "manifest.json"
+];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(
