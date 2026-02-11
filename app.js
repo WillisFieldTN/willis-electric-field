@@ -133,9 +133,17 @@ function renderJob(id) {
 
   main.innerHTML = `
     <div class="card">
-      <h3>${customer.name || "Unknown Customer"}</h3>
-      <p>${customer.address || "No address"}</p>
+      <h3>Call Details</h3>
+
       <div class="color-bar" style="background:${urgencyColor}"></div>
+
+      <h4>Customer</h4>
+      <p><strong>${customer.name || "Unknown Customer"}</strong></p>
+      <p>${customer.address || "No address"}</p>
+      <p>${customer.notes || ""}</p>
+
+      <h4>Job Info</h4>
+      <p><strong>Date:</strong> ${job.date}</p>
 
       <label>Assigned Technician</label>
       <select id="techSelect">
@@ -161,19 +169,21 @@ function renderJob(id) {
       <label>Notes</label>
       <textarea id="jobNotes">${job.notes || ""}</textarea>
 
-      <label>Parts Used</label>
+      <h4>Parts Used</h4>
       <div id="partsUsed"></div>
       <button class="small-btn" id="addPartBtn">+ Add Part Used</button>
 
-      <label>Photos (offline)</label>
+      <h4>Photos</h4>
       <input type="file" id="photoInput" accept="image/*" multiple />
       <div id="photoList"></div>
 
       <button class="small-btn" id="saveJobBtn">Save</button>
+      <button class="small-btn" id="completeJobBtn">✅ Complete Call</button>
       <button class="small-btn" onclick="renderDispatch()">⬅️ Back</button>
     </div>
   `;
 
+  // Save button
   document.getElementById("saveJobBtn").onclick = () => {
     const prevStatus = job.status;
 
@@ -200,9 +210,31 @@ function renderJob(id) {
 
     saveDB(db);
     alert("Saved!");
+    renderJob(id);
+  };
+
+  // Complete call button
+  document.getElementById("completeJobBtn").onclick = () => {
+    job.status = "Completed";
+
+    // Deduct parts
+    job.partsUsed.forEach(pu => {
+      const part = db.inventory.find(p => p.id === pu.partId);
+      if (part) part.quantity -= pu.quantity;
+      if (part && part.quantity < 0) part.quantity = 0;
+    });
+
+    // Set tech free
+    db.technicians.forEach(t => {
+      if (t.id === job.assignedTech) t.status = "Free";
+    });
+
+    saveDB(db);
+    alert("Call completed!");
     renderDispatch();
   };
 
+  // Photo upload
   document.getElementById("photoInput").onchange = (e) => {
     const files = Array.from(e.target.files);
     files.forEach(file => {
@@ -217,9 +249,20 @@ function renderJob(id) {
     });
   };
 
+  // Render parts used list
   document.getElementById("addPartBtn").onclick = () => renderAddPartUsed(job.id);
-
   renderPartsUsed(job);
+
+  // Render photos
+  const photoList = document.getElementById("photoList");
+  photoList.innerHTML = "";
+  (job.photos || []).forEach(p => {
+    const img = document.createElement("img");
+    img.src = p;
+    img.style.width = "100%";
+    img.style.marginTop = "10px";
+    photoList.appendChild(img);
+  });
 }
 
 function renderPartsUsed(job) {
