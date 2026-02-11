@@ -8,7 +8,13 @@ const defaultDB = {
   jobs: [],
   inventory: [],
   equipment: [],
-  locations: ["Van AB", "Van JS", "Van JW", "Service Van", "Shop"]
+  locations: ["Van AB", "Van JS", "Van JW", "Service Van", "Shop"],
+  technicians: [
+    { id: "tech_ab", name: "Van AB", status: "Free" },
+    { id: "tech_js", name: "Van JS", status: "Free" },
+    { id: "tech_jw", name: "Van JW", status: "Free" },
+    { id: "tech_sv", name: "Service Van", status: "Free" }
+  ]
 };
 
 function loadDB() {
@@ -42,6 +48,7 @@ function renderHome() {
     <button class="big-btn" id="dispatchBtn">📅 Dispatch (Today)</button>
     <button class="big-btn" id="customersBtn">👥 Customers</button>
     <button class="big-btn" id="inventoryBtn">🧰 Inventory</button>
+    <button class="big-btn" id="techBtn">👨‍🔧 Technicians</button>
     <button class="big-btn" id="searchBtn">🔍 Equipment Search</button>
     <button class="big-btn" id="exportBtn">⬆️ Export Data</button>
     <button class="big-btn" id="importBtn">⬇️ Import Data</button>
@@ -50,6 +57,7 @@ function renderHome() {
   document.getElementById("dispatchBtn").onclick = renderDispatch;
   document.getElementById("customersBtn").onclick = renderCustomers;
   document.getElementById("inventoryBtn").onclick = renderInventory;
+  document.getElementById("techBtn").onclick = renderTechnicians;
   document.getElementById("searchBtn").onclick = renderEquipmentSearch;
   document.getElementById("exportBtn").onclick = exportData;
   document.getElementById("importBtn").onclick = importData;
@@ -89,17 +97,18 @@ function renderDispatch() {
 
   jobs.forEach(job => {
     const customer = db.customers.find(c => c.id === job.customerId) || {};
+    const tech = db.technicians.find(t => t.id === job.assignedTech) || { name: "Unassigned" };
     const urgencyColor = job.urgency === "red" ? "#d9534f" :
                         job.urgency === "yellow" ? "#f0ad4e" : "#5cb85c";
 
     const card = document.createElement("div");
     card.className = "card";
     card.innerHTML = `
-      <h3>${customer.name || "Unknown Customer"}</h3>
+      <h3>${customer.name || "Unknown Customer"} (${tech.name})</h3>
       <p>${customer.address || "No address"}</p>
       <div class="color-bar" style="background:${urgencyColor}"></div>
       <div class="status">Status: ${job.status}</div>
-      <button class="small-btn" onclick="renderJob(${JSON.stringify(job.id)})">Open</button>
+      <button class="small-btn" onclick="renderJob('${job.id}')">Open</button>
     `;
     list.appendChild(card);
   });
@@ -120,6 +129,19 @@ function renderJob(id) {
       <p>${customer.address || "No address"}</p>
       <div class="color-bar" style="background:${urgencyColor}"></div>
 
+      <label>Assigned Technician</label>
+      <select id="techSelect">
+        <option value="">Unassigned</option>
+        ${db.technicians.map(t => `<option value="${t.id}" ${job.assignedTech === t.id ? "selected" : ""}>${t.name}</option>`).join("")}
+      </select>
+
+      <label>Customer Home?</label>
+      <select id="homeStatus">
+        <option value="unknown" ${job.homeStatus === "unknown" ? "selected" : ""}>Unknown</option>
+        <option value="home" ${job.homeStatus === "home" ? "selected" : ""}>Home</option>
+        <option value="not_home" ${job.homeStatus === "not_home" ? "selected" : ""}>Not Home</option>
+      </select>
+
       <label>Status</label>
       <select id="statusSelect">
         <option ${job.status === "Scheduled" ? "selected" : ""}>Scheduled</option>
@@ -131,9 +153,12 @@ function renderJob(id) {
       <label>Notes</label>
       <textarea id="jobNotes">${job.notes || ""}</textarea>
 
+      <label>Parts Used</label>
+      <div id="partsUsed"></div>
+      <button class="small-btn" id="addPartBtn">+ Add Part Used</button>
+
       <label>Photos (offline)</label>
       <input type="file" id="photoInput" accept="image/*" multiple />
-
       <div id="photoList"></div>
 
       <button class="small-btn" id="saveJobBtn">Save</button>
@@ -142,8 +167,29 @@ function renderJob(id) {
   `;
 
   document.getElementById("saveJobBtn").onclick = () => {
+    const prevStatus = job.status;
+
+    job.assignedTech = document.getElementById("techSelect").value;
+    job.homeStatus = document.getElementById("homeStatus").value;
     job.status = document.getElementById("statusSelect").value;
     job.notes = document.getElementById("jobNotes").value;
+
+    // Update tech status
+    db.technicians.forEach(t => {
+      if (t.id === job.assignedTech) {
+        t.status = job.status === "Completed" ? "Free" : "On a call";
+      }
+    });
+
+    // Deduct parts if completed
+    if (job.status === "Completed" && prevStatus !== "Completed") {
+      job.partsUsed.forEach(pu => {
+        const part = db.inventory.find(p => p.id === pu.partId);
+        if (part) part.quantity -= pu.quantity;
+        if (part && part.quantity < 0) part.quantity = 0;
+      });
+    }
+
     saveDB(db);
     alert("Saved!");
     renderDispatch();
@@ -163,15 +209,69 @@ function renderJob(id) {
     });
   };
 
-  const photoList = document.getElementById("photoList");
-  photoList.innerHTML = "";
-  (job.photos || []).forEach((p, index) => {
-    const img = document.createElement("img");
-    img.src = p;
-    img.style.width = "100%";
-    img.style.marginTop = "10px";
-    photoList.appendChild(img);
+  document.getElementById("addPartBtn").onclick = () => renderAddPartUsed(job.id);
+
+  renderPartsUsed(job);
+}
+
+function renderPartsUsed(job) {
+  const db = loadDB();
+  const partsDiv = document.getElementById("partsUsed");
+  partsDiv.innerHTML = "";
+
+  (job.partsUsed || []).forEach(pu => {
+    const part = db.inventory.find(p => p.id === pu.partId);
+    const desc = part ? `${part.partNumber} - ${part.description}` : "Unknown part";
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <p>${desc} | Qty used: ${pu.quantity}</p>
+      <button class="small-btn red" onclick="removePartUsed('${job.id}','${pu.partId}')">Remove</button>
+    `;
+    partsDiv.appendChild(card);
   });
+}
+
+function removePartUsed(jobId, partId) {
+  const db = loadDB();
+  const job = db.jobs.find(j => j.id === jobId);
+  if (!job) return;
+  job.partsUsed = (job.partsUsed || []).filter(p => p.partId !== partId);
+  saveDB(db);
+  renderJob(jobId);
+}
+
+function renderAddPartUsed(jobId) {
+  const db = loadDB();
+  const job = db.jobs.find(j => j.id === jobId);
+  if (!job) return;
+
+  main.innerHTML = `
+    <div class="card">
+      <h3>Add Part Used</h3>
+
+      <label>Part</label>
+      <select id="partSelect">
+        ${db.inventory.map(p => `<option value="${p.id}">${p.location} | ${p.partNumber} - ${p.description} | Qty: ${p.quantity}</option>`).join("")}
+      </select>
+
+      <label>Quantity Used</label>
+      <input id="qtyUsed" type="number" value="1" />
+
+      <button class="small-btn" id="addUsedBtn">Add</button>
+      <button class="small-btn" onclick="renderJob('${jobId}')">⬅️ Back</button>
+    </div>
+  `;
+
+  document.getElementById("addUsedBtn").onclick = () => {
+    const partId = document.getElementById("partSelect").value;
+    const qty = parseInt(document.getElementById("qtyUsed").value || 0);
+
+    if (!job.partsUsed) job.partsUsed = [];
+    job.partsUsed.push({ partId, quantity: qty });
+    saveDB(db);
+    renderJob(jobId);
+  };
 }
 
 function renderJobForm(date) {
@@ -186,6 +286,19 @@ function renderJobForm(date) {
       <label>Customer</label>
       <select id="customerSelect">
         ${db.customers.map(c => `<option value="${c.id}">${c.name}</option>`).join("")}
+      </select>
+
+      <label>Assigned Technician</label>
+      <select id="techSelect">
+        <option value="">Unassigned</option>
+        ${db.technicians.map(t => `<option value="${t.id}">${t.name}</option>`).join("")}
+      </select>
+
+      <label>Customer Home?</label>
+      <select id="homeStatus">
+        <option value="unknown">Unknown</option>
+        <option value="home">Home</option>
+        <option value="not_home">Not Home</option>
       </select>
 
       <label>Urgency</label>
@@ -208,11 +321,21 @@ function renderJobForm(date) {
       id: uuid(),
       date: document.getElementById("jobDate").value,
       customerId: document.getElementById("customerSelect").value,
+      assignedTech: document.getElementById("techSelect").value,
+      homeStatus: document.getElementById("homeStatus").value,
       urgency: document.getElementById("urgencySelect").value,
       status: "Scheduled",
       notes: document.getElementById("jobNotes").value,
-      photos: []
+      photos: [],
+      partsUsed: []
     };
+
+    // set tech status
+    const techId = newJob.assignedTech;
+    db.technicians.forEach(t => {
+      if (t.id === techId) t.status = "On a call";
+    });
+
     db.jobs.push(newJob);
     saveDB(db);
     renderDispatch();
@@ -260,13 +383,6 @@ function renderCustomerForm() {
       <label>Address</label>
       <input id="custAddress" />
 
-      <label>Customer Home?</label>
-      <select id="custHome">
-        <option value="unknown">Unknown</option>
-        <option value="home">Home</option>
-        <option value="not_home">Not Home</option>
-      </select>
-
       <label>Special Notes</label>
       <textarea id="custNotes"></textarea>
 
@@ -281,7 +397,6 @@ function renderCustomerForm() {
       id: uuid(),
       name: document.getElementById("custName").value,
       address: document.getElementById("custAddress").value,
-      homeStatus: document.getElementById("custHome").value,
       notes: document.getElementById("custNotes").value
     };
     db.customers.push(newCustomer);
@@ -300,13 +415,6 @@ function renderCustomer(id) {
       <h3>${cust.name}</h3>
       <p>${cust.address}</p>
 
-      <label>Customer Home?</label>
-      <select id="custHome">
-        <option value="unknown" ${cust.homeStatus === "unknown" ? "selected" : ""}>Unknown</option>
-        <option value="home" ${cust.homeStatus === "home" ? "selected" : ""}>Home</option>
-        <option value="not_home" ${cust.homeStatus === "not_home" ? "selected" : ""}>Not Home</option>
-      </select>
-
       <label>Special Notes</label>
       <textarea id="custNotes">${cust.notes || ""}</textarea>
 
@@ -316,7 +424,6 @@ function renderCustomer(id) {
   `;
 
   document.getElementById("saveCustBtn").onclick = () => {
-    cust.homeStatus = document.getElementById("custHome").value;
     cust.notes = document.getElementById("custNotes").value;
     saveDB(db);
     alert("Saved!");
@@ -399,6 +506,7 @@ function renderNewPartForm() {
   `;
 
   document.getElementById("createPartBtn").onclick = () => {
+    const db = loadDB();
     const newPart = {
       id: uuid(),
       location: loc,
@@ -422,6 +530,33 @@ function adjustQty(id, amount) {
   if (part.quantity < 0) part.quantity = 0;
   saveDB(db);
   renderInventoryList();
+}
+
+// -----------------------------
+// Technicians
+// -----------------------------
+function renderTechnicians() {
+  const db = loadDB();
+  main.innerHTML = `
+    <div class="card">
+      <h3>Technicians</h3>
+      <div id="techList"></div>
+      <button class="small-btn" onclick="renderHome()">⬅️ Back</button>
+    </div>
+  `;
+
+  const list = document.getElementById("techList");
+  list.innerHTML = "";
+
+  db.technicians.forEach(t => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <h3>${t.name}</h3>
+      <p>Status: ${t.status}</p>
+    `;
+    list.appendChild(card);
+  });
 }
 
 // -----------------------------
@@ -457,7 +592,7 @@ function renderEquipmentSearch() {
       card.innerHTML = `
         <h3>${e.model} - ${e.serial}</h3>
         <p>${e.location || "No location"} | ${e.type || "Unknown"}</p>
-        <button class="small-btn" onclick="renderEquipment(${JSON.stringify(e.id)})">Open</button>
+        <button class="small-btn" onclick="renderEquipment('${e.id}')">Open</button>
       `;
       resDiv.appendChild(card);
     });
