@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Willis Electric Field</title>
   <link rel="stylesheet" href="styles.css" />
+  <link rel="manifest" href="manifest.json" />
 </head>
 <body>
   <div id="app">
@@ -12,19 +13,14 @@
       <h1>Willis Electric Field</h1>
     </header>
 
-    <main>
-      <button class="big-btn" id="dispatchBtn">📅 Dispatch (Today)</button>
-      <button class="big-btn" id="customersBtn">👥 Customers</button>
-      <button class="big-btn" id="inventoryBtn">🧰 Inventory</button>
-      <button class="big-btn" id="searchBtn">🔍 Equipment Search</button>
-    </main>
+    <main id="main"></main>
   </div>
 
   <script src="app.js"></script>
-<script>
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("service-worker.js");
-  }
-</script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("service-worker.js");
+    }
+  </script>
 </body>
 </html>
