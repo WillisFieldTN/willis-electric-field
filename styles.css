@@ -12,12 +12,16 @@ header {
   text-align: center;
 }
 
+main {
+  padding: 15px;
+}
+
 .big-btn {
   display: block;
-  width: 90%;
-  margin: 15px auto;
-  padding: 25px;
-  font-size: 24px;
+  width: 100%;
+  margin: 10px 0;
+  padding: 18px;
+  font-size: 20px;
   border: none;
   border-radius: 10px;
   background: #007bff;
@@ -26,9 +30,68 @@ header {
 
 .big-btn:hover {
   background: #0056b3;
+  cursor: pointer;
 }
 
-main {
+.card {
+  background: white;
+  border-radius: 10px;
+  padding: 15px;
+  margin: 10px 0;
+}
+
+.card h3 {
+  margin: 0 0 10px;
+}
+
+.small-btn {
+  padding: 10px 15px;
+  border: none;
+  border-radius: 8px;
+  background: #007bff;
+  color: white;
+  margin-right: 10px;
+}
+
+.small-btn.red { background: #d9534f; }
+.small-btn.green { background: #5cb85c; }
+.small-btn.yellow { background: #f0ad4e; }
+
+input, select, textarea {
+  width: 100%;
+  padding: 10px;
+  margin: 8px 0;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+
+label {
+  font-weight: bold;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+}
+
+.row > div {
+  flex: 1;
+}
+
+.color-bar {
+  height: 8px;
+  border-radius: 8px;
+  margin-top: 10px;
+}
+
+.status {
+  margin-top: 10px;
+  font-weight: bold;
+}
+
+footer {
+  padding: 10px;
   text-align: center;
-  padding-top: 20px;
+  color: #777;
+  font-size: 12px;
 }
